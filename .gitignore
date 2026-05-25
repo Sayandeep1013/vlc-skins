@@ -1,0 +1,9 @@
+# Local VLC logs or scratch files
+vlc-*.log
+vlc-out.txt
+vlc-err.txt
+
+# OS/editor noise
+Thumbs.db
+.DS_Store
+.vscode/
