@@ -45,12 +45,13 @@ D:\vlc\skins\Materia.vlt
 5. Choose the `.vlt` file.
 6. Save and restart VLC.
 
-## Test Captures
+## Previews
 
-Actual local VLC render captures are included:
+Official preview images from each upstream skin project:
 
-- `VeLoCity-Dark-Mist-actual.png`
-- `Materia-actual.png`
+| VeLoCity - Dark Mist | Materia |
+|---|---|
+| ![VeLoCity Dark Mist preview](screenshots/velocity-dark-mist-preview.png) | ![Materia preview](screenshots/materia-preview.png) |
 
 ## Upstream Projects
 
