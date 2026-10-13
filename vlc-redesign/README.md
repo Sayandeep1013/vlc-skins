@@ -12,9 +12,9 @@ It isn't a skin. It's a real player built on libVLC, so it plays everything VLC 
 |---|---|
 | ![Music](screenshots/music.jpg) | ![Fullscreen](screenshots/fullscreen.jpg) |
 
-| Seek preview | Queue | Player settings |
-|---|---|---|
-| ![Seek preview](screenshots/seek-preview.jpg) | ![Queue](screenshots/queue.jpg) | ![Settings](screenshots/settings.jpg) |
+| Seek preview | Effects and filters | Queue | Player settings |
+|---|---|---|---|
+| ![Seek preview](screenshots/seek-preview.jpg) | ![Effects](screenshots/effects.jpg) | ![Queue](screenshots/queue.jpg) | ![Settings](screenshots/settings.jpg) |
 
 ## Features
 
@@ -29,13 +29,24 @@ It isn't a skin. It's a real player built on libVLC, so it plays everything VLC 
 - On-screen messages show the action *and* the key you pressed.
 - Songs look different from videos: big cover art, title and artist, and a waveform seek bar. The waveform can be turned off under Player settings → Playback.
 
+**VLC's Tools** (in the `⋯` menu and the right-click menu; same names, ranges and defaults as VLC)
+- **Effects and Filters** (<kbd>Ctrl</kbd>+<kbd>E</kbd>):
+  - *Audio:* 10-band equalizer with VLC's presets, preamp and 2-pass; compressor; spatializer; stereo widener; pitch shift; stereo mode.
+  - *Video:* image adjust (brightness, contrast, hue, saturation, gamma), sharpen, banding removal, film grain; crop (ratios or exact pixels); zoom and aspect ratio; geometry (rotate 90/180/270, flips, transpose, free-angle rotate); colors (invert, sepia, posterize, gradient, color extraction, color threshold); overlay text and logo; advanced (anaglyph 3D, mirror, psychedelic, waves, water, motion blur, motion detect, spatial blur, denoiser, anti-flicker); deinterlace and its mode.
+  - *Synchronization:* audio and subtitle delay.
+  - Changes apply live, the way VLC's own window applies them. Effects are remembered between sessions; crop, zoom and overlays reset each session, as in VLC.
+- **Media Information** (<kbd>Ctrl</kbd>+<kbd>I</kbd>): editable tags with *Save metadata*. **Codec Information** (<kbd>Ctrl</kbd>+<kbd>J</kbd>): every stream's codec, resolution, frame rate, channels and sample rate. **Statistics**: live bitrates, decoded, displayed and lost frames.
+- **Messages** (<kbd>Ctrl</kbd>+<kbd>M</kbd>): the engine's log with errors / warnings / debug verbosity, Copy and Clear. **Plugins**: the available audio and video filters and audio outputs.
+- **Preferences** (<kbd>Ctrl</kbd>+<kbd>P</kbd>): opens classic VLC's preferences, which edit the same `vlcrc` this player reads.
+- Also from VLC's menus: **Jump to time** (<kbd>Ctrl</kbd>+<kbd>T</kbd>), zoom, crop, deinterlace, always on top, and stereo mode.
+
 **Fullscreen**
 - No top bar. A floating controller with play/pause in the center fades in when you move the mouse and slowly fades out again.
 
 **Like your VLC**
 - Uses your VLC installation (`libvlc`) and your `vlcrc`: hotkeys, jump sizes, volume step, max volume, snapshot folder, and other preferences. It only reads `vlcrc`, never writes it.
 - The arrow keys work as in VLC: Left/Right jump, Up/Down change volume, and Shift/Alt/Ctrl + arrows jump by your configured sizes.
-- Menu shortcuts: <kbd>Ctrl</kbd>+<kbd>O</kbd> open, <kbd>Ctrl</kbd>+<kbd>F</kbd> folder, <kbd>Ctrl</kbd>+<kbd>N</kbd> network stream, <kbd>Ctrl</kbd>+<kbd>L</kbd> queue, <kbd>Ctrl</kbd>+<kbd>E</kbd> player settings, <kbd>F1</kbd> keyboard shortcuts.
+- Menu shortcuts: <kbd>Ctrl</kbd>+<kbd>O</kbd> open, <kbd>Ctrl</kbd>+<kbd>F</kbd> folder, <kbd>Ctrl</kbd>+<kbd>N</kbd> network stream, <kbd>Ctrl</kbd>+<kbd>L</kbd> queue, <kbd>Ctrl</kbd>+<kbd>E</kbd> effects and filters, <kbd>Ctrl</kbd>+<kbd>I</kbd> / <kbd>Ctrl</kbd>+<kbd>J</kbd> media / codec information, <kbd>Ctrl</kbd>+<kbd>M</kbd> messages, <kbd>Ctrl</kbd>+<kbd>P</kbd> preferences, <kbd>Ctrl</kbd>+<kbd>T</kbd> jump to time, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> player settings, <kbd>F1</kbd> keyboard shortcuts.
 - Drag and drop files or folders. Dropping a subtitle file adds it to the current video.
 - **Open in Classic VLC** hands the current file to the regular VLC.
 
@@ -89,6 +100,9 @@ Layout of the code:
 | `player/MainWindow.xaml(.cs)` | Window, bars, fullscreen controller, menus, sidebar, queue, music view, hotkey actions |
 | `player/Core/Player.cs` | libVLC setup and the queue |
 | `player/Core/VlcConfig.cs`, `HotKeys.cs` | Finds VLC, reads `vlcrc`, matches key presses to VLC's hotkey names |
+| `player/MainWindow.Tools.cs` | VLC's Tools: effects panel, media/codec info, messages, plugins, jump to time, video/audio menus |
+| `player/Core/Effects.cs` | The effects catalogue (VLC's module and variable names, ranges, defaults) and the engine that applies them live |
+| `player/Core/VlcVars.cs` | Calls into libvlccore to set those variables on the live audio/video outputs, as VLC's own window does |
 | `player/Core/Thumbnails.cs` | Seek-bar preview frames (storyboard + exact frames on demand) |
 | `player/Core/Waveform.cs` | Decodes audio with libVLC into peaks for the waveform seek bar |
 | `player/Core/ShellIntegration.cs` | Explorer *Open with* registration (HKCU) |
@@ -108,6 +122,14 @@ Copy the `.vlt` into VLC's `skins` folder, then Tools → Preferences → Interf
 ## Not built yet
 
 Parts of the redesign that aren't here yet: the library/home screen, the subtitle timeline, the rebuilt preferences window, and onboarding.
+
+From VLC's Tools menu, these are deliberately left out:
+- VLM, which is a streaming server.
+- Program Guide, for TV tuners.
+- Customize Interface, since this player's layout is the redesign itself.
+- Audio visualizations, which the music view replaces.
+- Interactive zoom, puzzle, and wall/clone. These need mouse input on the video or extra windows.
+- Subtitle speed and duration factor.
 
 ## Credits & licenses
 

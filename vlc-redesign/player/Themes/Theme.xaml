@@ -242,6 +242,103 @@
     </Setter>
   </Style>
 
+  <!-- Vertical slider (equalizer bands). -->
+  <Style x:Key="VTrackPart" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="IsTabStop" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RepeatButton">
+          <Border Background="Transparent">
+            <Border Width="4" CornerRadius="2" Background="{TemplateBinding Background}"/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="VSlider" TargetType="Slider">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="IsMoveToPointEnabled" Value="True"/>
+    <Setter Property="Orientation" Value="Vertical"/>
+    <Setter Property="Width" Value="22"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="False">
+            <Track.DecreaseRepeatButton>
+              <RepeatButton Style="{StaticResource VTrackPart}" Background="{StaticResource Accent}" Command="Slider.DecreaseLarge"/>
+            </Track.DecreaseRepeatButton>
+            <Track.IncreaseRepeatButton>
+              <RepeatButton Style="{StaticResource VTrackPart}" Background="#333333" Command="Slider.IncreaseLarge"/>
+            </Track.IncreaseRepeatButton>
+            <Track.Thumb>
+              <Thumb Style="{StaticResource SliderThumb}"/>
+            </Track.Thumb>
+          </Track>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- On/off switch (effects). -->
+  <Style x:Key="Switch" TargetType="CheckBox">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <Border x:Name="Track" Width="34" Height="20" CornerRadius="10" Background="#3A3A3A">
+            <Ellipse x:Name="Knob" Width="14" Height="14" Fill="#BDBDBD" HorizontalAlignment="Left" Margin="3,0"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}"/>
+              <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+              <Setter TargetName="Knob" Property="Fill" Value="White"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Track" Property="Opacity" Value="0.4"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Collapsible section header in the effects / info panels. -->
+  <Style x:Key="SectionHeader" TargetType="ToggleButton">
+    <Setter Property="Foreground" Value="{StaticResource IconHi}"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="8,8">
+            <DockPanel>
+              <ui:IconView x:Name="Chev" DockPanel.Dock="Left" Data="{StaticResource Icon.Chevron}" Size="14" Margin="0,0,8,0"
+                           Foreground="{StaticResource TextDim}" RenderTransformOrigin="0.5,0.5">
+                <ui:IconView.RenderTransform><RotateTransform x:Name="Rot" Angle="0"/></ui:IconView.RenderTransform>
+              </ui:IconView>
+              <ContentPresenter VerticalAlignment="Center"/>
+            </DockPanel>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{StaticResource Hover}"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Chev" Property="RenderTransform">
+                <Setter.Value><RotateTransform Angle="90"/></Setter.Value>
+              </Setter>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- Dark tooltips. -->
   <Style TargetType="ToolTip">
     <Setter Property="Foreground" Value="{StaticResource Text}"/>
@@ -388,7 +485,12 @@
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
           <Border Background="{TemplateBinding Background}" CornerRadius="8" BorderBrush="#2E2E2E" BorderThickness="1">
-            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+            <!-- Follow the TextBox's own scrollbar settings (ScrollViewer's default is an always-visible
+                 vertical bar, whose minimum height made every box tall). -->
+            <!-- No Margin here: WPF already applies the TextBox's Padding inside PART_ContentHost. -->
+            <ScrollViewer x:Name="PART_ContentHost"
+                          VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"
+                          HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"/>
           </Border>
         </ControlTemplate>
       </Setter.Value>

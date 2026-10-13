@@ -15,8 +15,11 @@ public sealed class AppSettings
     public bool Muted { get; set; }
     public string LastFolder { get; set; } = "";
     public bool Waveform { get; set; } = true;
+    public bool AlwaysOnTop { get; set; }
+    public EffectsState Effects { get; set; } = new();
 
-    static string FilePath => Path.Combine(
+    // VLC_REDESIGN_SETTINGS points test runs at a scratch file so they never touch real settings.
+    static string FilePath => Environment.GetEnvironmentVariable("VLC_REDESIGN_SETTINGS") is { Length: > 0 } custom ? custom : Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VLC-Redesign", "player.json");
 
     public static AppSettings Load()

@@ -82,13 +82,22 @@ public partial class MainWindow : Window
 
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
-        Closing += (_, _) => SaveAndDispose();
+        Closing += (_, _) =>
+        {
+            // Releasing VLC's engine takes a few seconds; get the window off screen first so
+            // closing feels instant.
+            SaveSettings(); // before hiding: RestoreBounds is only reliable while visible
+            _overlayWindow?.Hide();
+            Hide();
+            ReleasePlayer();
+        };
         PreviewKeyDown += OnPreviewKeyDown;
         StateChanged += (_, _) => UpdateWindowButtons();
         Overlay.Loaded += (_, _) => HookOverlayWindow();
         Overlay.SizeChanged += (_, _) => { FitDock(); FitCover(); };
         UpdateTooltips();
         UpdateQueueHeader();
+        InitTools();
     }
 
     // ------------------------------------------------------------------ window
@@ -205,6 +214,62 @@ public partial class MainWindow : Window
                 if (_openMenu != null) File.WriteAllText(arg + "_menu.txt", MenuScreenPos(_openMenu));
                 break;
             case "hover": Seek.DebugHover(arg == "off" ? null : double.Parse(arg, System.Globalization.CultureInfo.InvariantCulture)); break;
+            // Tools testing: side effects|info|log, fxtab audio|video|sync, fxa/fxv <module> on|off,
+            // fxp <var> <value>, eq on|off|<preset index>, vars (writes live VLC variables to <file>.vars)
+            case "fxtab": OpenEffects(arg switch { "video" => FxTabVideo, "sync" => FxTabSync, _ => FxTabAudio }); break;
+            case "fxa": { var a2 = arg.Split(' '); if (a2[1] == "on") Fx.AudioOn.Add(a2[0]); else Fx.AudioOn.Remove(a2[0]); SafeFx(_fx.ApplyAudio); break; }
+            case "fxv": { var a2 = arg.Split(' '); if (a2[1] == "on") Fx.VideoOn.Add(a2[0]); else Fx.VideoOn.Remove(a2[0]); SafeFx(_fx.ApplyVideo); break; }
+            case "fxp":
+            {
+                var a2 = arg.Split(' ');
+                var prm = EffectCatalog.AudioFilters.Concat(EffectCatalog.VideoFilters).SelectMany(f => f.Params).First(p => p.Var == a2[0]);
+                double val = double.Parse(a2[1], System.Globalization.CultureInfo.InvariantCulture);
+                if (EffectCatalog.AudioFilters.Any(f => f.Params.Contains(prm))) _fx.SetAudioParam(prm, val); else _fx.SetVideoParam(prm, val);
+                break;
+            }
+            case "transform": Fx.Transform = arg; SafeFx(_fx.ApplyVideo); break;
+            case "eq":
+                if (arg == "on" || arg == "off") Fx.EqOn = arg == "on"; else ApplyEqPreset(uint.Parse(arg));
+                SafeFx(_fx.ApplyAudio); break;
+            case "zoom": SetZoom(float.Parse(arg, System.Globalization.CultureInfo.InvariantCulture)); break;
+            case "crop": SetCrop(arg == "none" ? null : arg, arg); break;
+            case "marq": _marqOn = arg != "off"; if (_marqOn) _marqText = arg; SafeFx(ApplySessionVideo); break;
+            case "stereo": SetStereo(int.Parse(arg), arg); break;
+            case "deint": Fx.Deinterlace = arg; SafeFx(_fx.ApplyDeinterlace); break;
+            case "jump": JumpInput.Text = arg; DoJump(); break;
+            case "info": OpenInfo(arg switch { "codec" => InfoTabCodec, "stats" => InfoTabStats, _ => InfoTabGeneral }); break;
+            case "log": OpenLog(); if (arg == "debug") SetLogVerbosity(2); break;
+            case "ontop": ToggleOnTop(); break;
+            case "metasave": { var m = _player.Mp.Media!; m.SetMeta(MetadataType.Artist, arg); File.WriteAllText(Environment.GetEnvironmentVariable("VLC_REDESIGN_DEBUG") + ".meta", m.SaveMeta().ToString()); break; }
+            case "measure":
+            {
+                var tb = Descendants<TextBox>(InfoHost).FirstOrDefault();
+                if (tb == null) break;
+                var host = tb.Template.FindName("PART_ContentHost", tb) as FrameworkElement;
+                var sv = host as ScrollViewer;
+                File.WriteAllText(Environment.GetEnvironmentVariable("VLC_REDESIGN_DEBUG") + ".measure",
+                    $"textbox {tb.ActualWidth:0.0}x{tb.ActualHeight:0.0} pad={tb.Padding} font={tb.FontSize} host={host?.ActualHeight:0.0} " +
+                    $"vbar={sv?.ComputedVerticalScrollBarVisibility} hbar={sv?.ComputedHorizontalScrollBarVisibility} extent={sv?.ExtentHeight:0.0} viewport={sv?.ViewportHeight:0.0}");
+                break;
+            }
+            case "vars":
+            {
+                var sb = new System.Text.StringBuilder();
+                IntPtr h = _player.Mp.NativeReference;
+                void Dump(string who, IntPtr o, string[] names)
+                {
+                    foreach (var n in names)
+                        sb.AppendLine($"{who} {n} = {(VlcVars.GetStringDebug(o, n) ?? VlcVars.GetFloat(o, n)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? VlcVars.GetInt(o, n)?.ToString() ?? "<none>")}");
+                }
+                string[] an = { "audio-filter", "equalizer-preamp", "equalizer-bands", "equalizer-2pass", "compressor-ratio", "pitch-shift", "spatializer-roomsize", "stereo-mode" };
+                string[] vn = { "video-filter", "transform-type", "rotate-angle", "sepia-intensity", "contrast", "brightness", "deinterlace", "deinterlace-mode", "zoom", "crop", "sub-source" };
+                Dump("player", h, an.Concat(vn).ToArray());
+                sb.AppendLine($"aouts={VlcVars.ForEach(h, VlcVars.AudioOutput, a => Dump("aout", a, an))}");
+                sb.AppendLine($"vouts={VlcVars.ForEach(h, VlcVars.VideoOutput, v => Dump("vout", v, vn))}");
+                lock (_logLock) foreach (var (_, t) in _log.Where(x => (x.Text.Contains("audio filter") || x.Text.Contains("equalizer") || x.Text.Contains("compressor") || x.Text.Contains("spatializer") || x.Text.Contains("stereo_widen") || x.Text.Contains("scaletempo")) || x.Level == LogLevel.Error).TakeLast(40)) sb.AppendLine("log: " + t);
+                File.WriteAllText(Environment.GetEnvironmentVariable("VLC_REDESIGN_DEBUG") + ".vars", sb.ToString());
+                break;
+            }
             case "key":
                 // "key Right": runs a key press through the same handler as real keyboard input.
                 var kk = (Key)Enum.Parse(typeof(Key), arg);
@@ -296,13 +361,17 @@ public partial class MainWindow : Window
         x < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 100 &&
         y < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 100;
 
-    void SaveAndDispose()
+    void SaveSettings()
     {
         var b = _fullscreen ? _restoreBounds : RestoreBounds;
         if (!b.IsEmpty) { _settings.Left = b.Left; _settings.Top = b.Top; _settings.Width = b.Width; _settings.Height = b.Height; }
         _settings.Maximized = (_fullscreen ? _restoreState : WindowState) == WindowState.Maximized;
         _settings.Volume = _volume;
         _settings.Save();
+    }
+
+    void ReleasePlayer()
+    {
         _tick.Stop();
         DropThumbnails();
         _player.Dispose();
@@ -495,7 +564,7 @@ public partial class MainWindow : Window
     bool AnyMenuOpen => ContextMenuService.GetContextMenu(Overlay)?.IsOpen == true || _openMenu?.IsOpen == true;
 
     bool CanAutoHide() =>
-        !_pinChrome && !_musicMode && _player.Mp.IsPlaying && Side.Visibility != Visibility.Visible && UrlBox.Visibility != Visibility.Visible &&
+        !_pinChrome && !_musicMode && _player.Mp.IsPlaying && Side.Visibility != Visibility.Visible && UrlBox.Visibility != Visibility.Visible && JumpBox.Visibility != Visibility.Visible &&
         !AnyMenuOpen && !TopBar.IsMouseOver && !BottomBar.IsMouseOver && !Dock.IsMouseOver && Mouse.LeftButton != MouseButtonState.Pressed;
 
     void ShowChrome()
@@ -588,6 +657,7 @@ public partial class MainWindow : Window
         if (e.ClickCount == 2) { ToggleFullscreen(); e.Handled = true; return; }
         if (Side.Visibility == Visibility.Visible) { CloseSide(); return; }
         if (UrlBox.Visibility == Visibility.Visible) { UrlBox.Visibility = Visibility.Collapsed; return; }
+        if (JumpBox.Visibility == Visibility.Visible) { JumpBox.Visibility = Visibility.Collapsed; return; }
         // Dragging the video moves the window, like VLC.
         if (WindowState == WindowState.Normal && !_fullscreen) _dragFrom = e.GetPosition(Overlay);
     }
@@ -869,7 +939,7 @@ public partial class MainWindow : Window
         MuteButton.ToolTip = "Mute" + KeyHint("vol-mute");
         AudioButton.ToolTip = "Audio" + KeyHint("audio-track");
         SubsButton.ToolTip = "Subtitles" + KeyHint("subtitle-track");
-        GearButton.ToolTip = "Player settings  (Ctrl+E)";
+        GearButton.ToolTip = "Player settings  (Ctrl+Shift+E)";
         QueueButton.ToolTip = "Queue  (Ctrl+L)";
         Volume.ToolTip = "Volume (scroll to change)";
         UpdateWindowButtons();
@@ -893,11 +963,18 @@ public partial class MainWindow : Window
                 case Key.F: OpenFolder(); break;
                 case Key.N: ShowUrlBox(); break;
                 case Key.L: ToggleSide(QueuePane); break;
-                case Key.E: ToggleSide(SettingsPane); break;
+                // VLC's Tools / Playback shortcuts.
+                case Key.E: if (EffectsPane.Visibility == Visibility.Visible && Side.Visibility == Visibility.Visible) CloseSide(); else OpenEffects(FxTabAudio); break;
+                case Key.I: OpenInfo(InfoTabGeneral); break;
+                case Key.J: OpenInfo(InfoTabCodec); break;
+                case Key.M: if (LogPane.Visibility == Visibility.Visible && Side.Visibility == Visibility.Visible) CloseSide(); else OpenLog(); break;
+                case Key.P: OpenPreferences(); break;
+                case Key.T: ShowJumpBox(); break;
                 default: return;
             }
             e.Handled = true;
         }
+        else if (mods == (ModifierKeys.Control | ModifierKeys.Shift) && k == Key.E) { ToggleSide(SettingsPane); e.Handled = true; }
         else if (mods == ModifierKeys.None && k == Key.F1) { ToggleSide(KeysPane); e.Handled = true; }
         else if (mods == ModifierKeys.None && k == Key.Escape && Side.Visibility == Visibility.Visible) { CloseSide(); e.Handled = true; }
     }
@@ -1081,8 +1158,9 @@ public partial class MainWindow : Window
         m.Items.Add(Item("Add Subtitle File…", AddSubtitleFile, "", "Subtitles", enabled: _player.HasMedia));
         m.Items.Add(new Separator());
         m.Items.Add(Item("Queue", () => ToggleSide(QueuePane), "Ctrl+L", "Queue"));
-        m.Items.Add(Item("Player Settings", () => ToggleSide(SettingsPane), "Ctrl+E", "Settings"));
+        m.Items.Add(Item("Player Settings", () => ToggleSide(SettingsPane), "Ctrl+Shift+E", "Settings"));
         m.Items.Add(Item("Keyboard Shortcuts", () => ToggleSide(KeysPane), "F1", "Keyboard"));
+        m.Items.Add(ToolsMenu());
         m.Items.Add(new Separator());
         m.Items.Add(Item("Open in Classic VLC", OpenInVlc, "", "Pin", enabled: _player.HasMedia));
         bool reg = ShellIntegration.IsRegistered();
@@ -1105,7 +1183,7 @@ public partial class MainWindow : Window
         m.Items.Add(Item("Previous", () => Do("prev"), _keys.Label("prev")));
         m.Items.Add(Item("Next", () => Do("next"), _keys.Label("next")));
         m.Items.Add(new Separator());
-        var audio = new MenuItem { Header = "Audio track" }; FillAudioMenu(audio.Items); m.Items.Add(audio);
+        var audio = new MenuItem { Header = "Audio track" }; FillAudioMenu(audio.Items); audio.Items.Add(new Separator()); audio.Items.Add(StereoMenu()); m.Items.Add(audio);
         var subs = new MenuItem { Header = "Subtitles" }; FillSubsMenu(subs.Items); m.Items.Add(subs);
         var speed = new MenuItem { Header = "Speed" };
         foreach (var r in new[] { 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f })
@@ -1114,13 +1192,16 @@ public partial class MainWindow : Window
         var aspect = new MenuItem { Header = "Aspect ratio" };
         foreach (var a in Aspects) aspect.Items.Add(Item(a.Label, () => { mp.AspectRatio = a.Value; ShowOsd($"Aspect ratio: {a.Label}"); }, isChecked: mp.AspectRatio == a.Value));
         m.Items.Add(aspect);
+        m.Items.Add(VideoMenu());
+        m.Items.Add(Item("Jump to Time…", ShowJumpBox, "Ctrl+T", "Clock", enabled: _player.HasMedia));
         m.Items.Add(new Separator());
         m.Items.Add(Item(_fullscreen ? "Exit Fullscreen" : "Fullscreen", ToggleFullscreen, _keys.Label("toggle-fullscreen"), "Fullscreen"));
         m.Items.Add(Item("Take Snapshot", () => TakeSnapshot(), _keys.Label("snapshot"), "Camera", enabled: _player.HasMedia));
         m.Items.Add(new Separator());
         m.Items.Add(Item("Open File…", () => OpenFiles(replace: true), "Ctrl+O", "File"));
         m.Items.Add(Item("Queue", () => ToggleSide(QueuePane), "Ctrl+L", "Queue"));
-        m.Items.Add(Item("Player Settings", () => ToggleSide(SettingsPane), "Ctrl+E", "Settings"));
+        m.Items.Add(Item("Player Settings", () => ToggleSide(SettingsPane), "Ctrl+Shift+E", "Settings"));
+        m.Items.Add(ToolsMenu());
         return m;
     }
 
@@ -1187,8 +1268,11 @@ public partial class MainWindow : Window
 
     void OpenSide(FrameworkElement pane)
     {
-        foreach (var p in new FrameworkElement[] { SettingsPane, QueuePane, KeysPane }) p.Visibility = p == pane ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var p in new FrameworkElement[] { SettingsPane, QueuePane, KeysPane, EffectsPane, InfoPane, LogPane }) p.Visibility = p == pane ? Visibility.Visible : Visibility.Collapsed;
+        // The Tools panels hold more (equalizer, stream details, log lines), so they're wider.
+        Side.Width = pane == EffectsPane || pane == InfoPane || pane == LogPane ? 400 : 330;
         Side.Visibility = Visibility.Visible;
+        if (pane != InfoPane) _infoTimer.Stop();
         if (pane == SettingsPane) RefreshSidebar();
         if (pane == KeysPane) FillShortcuts();
         if (pane == QueuePane) { SyncToggles(); QueueList.ScrollIntoView(_player.CurrentItem); }

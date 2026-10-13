@@ -15,6 +15,7 @@ const ICONS = {
   Shuffle: 'shuffle', Add: 'plus', Remove: 'minus', Folder: 'folder-open', File: 'file-video',
   Network: 'radio', Keyboard: 'keyboard', Info: 'info', Quit: 'log-out', Chevron: 'chevron-right',
   Trash: 'trash-2', Speed: 'gauge', Camera: 'camera', Check: 'check', Reset: 'rotate-ccw', Pin: 'pin',
+  Tools: 'wrench', Effects: 'sliders-horizontal', Messages: 'scroll-text', Clock: 'clock', OnTop: 'pin', Crop: 'crop', Zoom: 'zoom-in', Prefs: 'settings-2', Sync: 'timer',
 };
 
 const num = (s) => parseFloat(s);

@@ -191,6 +191,7 @@
                       <TextBlock x:Name="AudioDelayValue" DockPanel.Dock="Right" Width="62" TextAlignment="Right" VerticalAlignment="Center" FontSize="13"/>
                       <Slider x:Name="AudioDelaySlider" Minimum="-5" Maximum="5" SmallChange="0.05" LargeChange="0.25" ValueChanged="AudioDelaySlider_ValueChanged"/>
                     </DockPanel>
+                    <Button Content="Equalizer and audio effects…" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,18,0,0" Click="OpenAudioFx_Click"/>
                   </StackPanel>
 
                   <StackPanel x:Name="PaneVideo" Visibility="Collapsed">
@@ -199,6 +200,7 @@
                     <TextBlock Text="Video track" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,16,0,4"/>
                     <StackPanel x:Name="VideoTracks"/>
                     <Button Content="Take snapshot" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,14,0,0" Click="Snapshot_Click"/>
+                    <Button Content="Video effects (color, rotate, crop…)" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OpenVideoFx_Click"/>
                   </StackPanel>
                 </Grid>
               </ScrollViewer>
@@ -258,6 +260,55 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+
+            <!-- Tools → Effects and Filters (VLC's "Adjustments and Effects"), built in MainWindow.Tools.cs -->
+            <DockPanel x:Name="EffectsPane" Visibility="Collapsed">
+              <Grid DockPanel.Dock="Top" Margin="10,4,10,0">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition Width="1.3*"/></Grid.ColumnDefinitions>
+                <RadioButton x:Name="FxTabAudio" Grid.Column="0" Content="Audio effects" Style="{StaticResource TabButton}" GroupName="fxtabs" Checked="FxTab_Checked" IsChecked="True"/>
+                <RadioButton x:Name="FxTabVideo" Grid.Column="1" Content="Video effects" Style="{StaticResource TabButton}" GroupName="fxtabs" Checked="FxTab_Checked"/>
+                <RadioButton x:Name="FxTabSync" Grid.Column="2" Content="Synchronization" Style="{StaticResource TabButton}" GroupName="fxtabs" Checked="FxTab_Checked"/>
+              </Grid>
+              <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Divider}" Margin="12,0"/>
+              <ScrollViewer x:Name="FxScroll" VerticalScrollBarVisibility="Auto" Padding="10,8,12,14">
+                <StackPanel x:Name="FxHost"/>
+              </ScrollViewer>
+            </DockPanel>
+
+            <!-- Tools → Media / Codec Information -->
+            <DockPanel x:Name="InfoPane" Visibility="Collapsed">
+              <Grid DockPanel.Dock="Top" Margin="10,4,10,0">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <RadioButton x:Name="InfoTabGeneral" Grid.Column="0" Content="General" Style="{StaticResource TabButton}" GroupName="infotabs" Checked="InfoTab_Checked" IsChecked="True"/>
+                <RadioButton x:Name="InfoTabCodec" Grid.Column="1" Content="Codec" Style="{StaticResource TabButton}" GroupName="infotabs" Checked="InfoTab_Checked"/>
+                <RadioButton x:Name="InfoTabStats" Grid.Column="2" Content="Statistics" Style="{StaticResource TabButton}" GroupName="infotabs" Checked="InfoTab_Checked"/>
+              </Grid>
+              <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Divider}" Margin="12,0"/>
+              <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,10,14,14">
+                <StackPanel x:Name="InfoHost"/>
+              </ScrollViewer>
+            </DockPanel>
+
+            <!-- Tools → Messages (libVLC log) and Plugins -->
+            <DockPanel x:Name="LogPane" Visibility="Collapsed">
+              <Grid DockPanel.Dock="Top" Margin="10,4,10,0">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <RadioButton x:Name="LogTabMessages" Grid.Column="0" Content="Messages" Style="{StaticResource TabButton}" GroupName="logtabs" Checked="LogTab_Checked" IsChecked="True"/>
+                <RadioButton x:Name="LogTabModules" Grid.Column="1" Content="Plugins" Style="{StaticResource TabButton}" GroupName="logtabs" Checked="LogTab_Checked"/>
+              </Grid>
+              <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Divider}" Margin="12,0"/>
+              <DockPanel x:Name="LogBar" DockPanel.Dock="Top" Margin="12,8,12,6">
+                <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource FlatButton}" Padding="10,5" Click="LogClear_Click"/>
+                <Button DockPanel.Dock="Right" Content="Copy" Style="{StaticResource FlatButton}" Padding="10,5" Margin="0,0,6,0" Click="LogCopy_Click"/>
+                <Button x:Name="LogLevelButton" Content="Verbosity: Warnings" Style="{StaticResource FlatButton}" Padding="10,5" HorizontalAlignment="Left" Click="LogLevel_Click"/>
+              </DockPanel>
+              <TextBox x:Name="LogText" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="{StaticResource Text}"
+                       FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="10,0,6,10"
+                       SelectionBrush="{StaticResource Accent}" CaretBrush="Transparent"/>
+              <ScrollViewer x:Name="ModulesScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="14,6,14,14">
+                <StackPanel x:Name="ModulesHost"/>
               </ScrollViewer>
             </DockPanel>
           </Grid>
@@ -337,6 +388,20 @@
           </Grid>
         </Border>
       </Grid>
+
+      <!-- Playback → Jump to Specific Time (Ctrl+T) -->
+      <Border x:Name="JumpBox" Visibility="Collapsed" Width="320" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Background="{StaticResource Menu}" CornerRadius="14" Padding="18" BorderBrush="#2A2A2A" BorderThickness="1" Effect="{StaticResource Shadow}">
+        <StackPanel>
+          <TextBlock Text="Jump to time" FontSize="14" Foreground="{StaticResource IconHi}" Margin="0,0,0,4"/>
+          <TextBlock x:Name="JumpHint" Text="h:mm:ss, mm:ss or seconds" FontSize="12" Foreground="{StaticResource TextFaint}" Margin="0,0,0,12"/>
+          <TextBox x:Name="JumpInput" Style="{StaticResource DarkText}" KeyDown="JumpInput_KeyDown"/>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Cancel" Style="{StaticResource FlatButton}" Margin="0,0,8,0" Click="JumpCancel_Click"/>
+            <Button Content="Go" Style="{StaticResource FlatButton}" Background="{StaticResource Accent}" Foreground="#111" Click="JumpGo_Click"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
 
       <!-- Network stream input -->
       <Border x:Name="UrlBox" Visibility="Collapsed" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"

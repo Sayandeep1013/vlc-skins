@@ -62,6 +62,7 @@ A redesigned media player, based on Juxtopposed's VLC redesign, that runs on the
 • A floating fullscreen controller that fades out
 • Music view with cover art and a waveform seek bar
 • Dark menus, a player-settings sidebar (speed, subtitles, audio, video), and a queue
+• VLC's tools: equalizer and audio effects, video effects (color, rotate, crop, zoom, deinterlace), media and codec information, messages
 • Keyboard shortcuts from your VLC settings, shown as you press them
 • Right-click → Open with for your video and audio files
 
@@ -75,5 +76,6 @@ Design by Juxtopposed (CC BY 4.0). An independent project, not affiliated with V
 - YouTube-style seek previews
 - Fullscreen floating controller
 - Music view with waveform seek bar
+- Equalizer, compressor, spatializer, pitch and video effects from VLC
 - Subtitle and audio track pickers, delays, speed
 - Queue with repeat and shuffle
