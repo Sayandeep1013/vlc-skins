@@ -108,8 +108,9 @@ jobs:
           $exes = if (Test-Path build/signed) { "build/signed" } else { "build/unsigned" }
           Copy-Item "$exes/*.exe" build/release/
           Push-Location build/release
-          Get-ChildItem -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLower(), $_.Name } |
-            Set-Content SHA256SUMS.txt -Encoding ascii
+          # LF line endings so `sha256sum -c SHA256SUMS.txt` works everywhere.
+          $sums = Get-ChildItem -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLower(), $_.Name }
+          [IO.File]::WriteAllText("$PWD/SHA256SUMS.txt", ($sums -join "`n") + "`n")
           Pop-Location
           Get-ChildItem build/release | Format-Table Name, Length
 
