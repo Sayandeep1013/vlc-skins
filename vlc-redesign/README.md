@@ -51,14 +51,22 @@ Two downloads on the [releases page](https://github.com/Sayandeep1013/vlc-skins/
 
 | File | Size | Notes |
 |---|---|---|
-| `VLC-Redesign-<version>-win-x64.exe` | ~70 MB | Self-contained, runs as is |
-| `VLC-Redesign-<version>-win-x64-small.exe` | ~1.5 MB | Needs the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) |
+| `VLC-Redesign-<version>-win-x64.exe` | ~70 MB | **Pick this one.** Self-contained: includes the .NET runtime it's written in, runs as is |
+| `VLC-Redesign-<version>-win-x64-small.exe` | ~1.5 MB | The same app without the runtime. Only if you already have the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) |
+
+Neither includes VLC itself; both use the VLC installed on your PC.
+
+Windows may show a SmartScreen notice because the exe isn't code-signed yet (*More info* → *Run anyway*). Free signing through SignPath Foundation is being set up ([CODE_SIGNING.md](CODE_SIGNING.md)), and a Microsoft Store version is planned ([STORE.md](STORE.md)). Store installs have no warning and update automatically.
 
 Put the exe somewhere permanent, for example `%LOCALAPPDATA%\Programs\VLC Redesign\`, and run it. To add it to *Open with*, use the `⋯` menu, or run it once with `--register-open-with` (remove with `--unregister-open-with`).
 
 If VLC is installed in an unusual place, set `VLC_DIR` to the folder that contains `libvlc.dll`.
 
 Player state (window position, volume, waveform setting) is saved in `%APPDATA%\VLC-Redesign\player.json`. Errors are logged to `%TEMP%\vlc-redesign-player.log`.
+
+## Releases
+
+Releases are built from source by GitHub Actions ([`.github/workflows/vlc-redesign-release.yml`](../.github/workflows/vlc-redesign-release.yml)). Pushing a tag like `v1.0.1` builds both exes, signs them once SignPath is configured, publishes the release, and produces the Store `.msix` as a build artifact. See [CODE_SIGNING.md](CODE_SIGNING.md), [STORE.md](STORE.md) and [PRIVACY.md](PRIVACY.md).
 
 ## Build
 

@@ -1086,7 +1086,7 @@ public partial class MainWindow : Window
         m.Items.Add(new Separator());
         m.Items.Add(Item("Open in Classic VLC", OpenInVlc, "", "Pin", enabled: _player.HasMedia));
         bool reg = ShellIntegration.IsRegistered();
-        m.Items.Add(Item(reg ? "Remove from Explorer's Open with" : "Add to Explorer's Open with", () =>
+        if (!ShellIntegration.IsPackaged) m.Items.Add(Item(reg ? "Remove from Explorer's Open with" : "Add to Explorer's Open with", () =>
         {
             try { if (reg) ShellIntegration.Unregister(); else ShellIntegration.Register(); ShowOsd(reg ? "Removed from Open with" : "Added to Open with"); }
             catch (Exception ex) { App.LogError(ex); ShowOsd("Couldn't update Open with"); }

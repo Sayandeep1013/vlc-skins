@@ -11,6 +11,7 @@ public partial class App : Application
         // "Open with" entry, then exit without showing the player.
         if (e.Args.Contains("--register-open-with") || e.Args.Contains("--unregister-open-with"))
         {
+            if (Core.ShellIntegration.IsPackaged) { Shutdown(0); return; } // the package manifest handles it
             try
             {
                 if (e.Args.Contains("--register-open-with")) Core.ShellIntegration.Register();
@@ -28,6 +29,17 @@ public partial class App : Application
         };
         MainWindow? w;
         try { w = new MainWindow(e.Args); }
+        catch (Core.VlcConfig.VlcMissingException ex)
+        {
+            // Offer the fix instead of a dead-end error.
+            var r = MessageBox.Show(ex.Message + "\n\nInstall VLC media player (free, from videolan.org), then open VLC Redesign again." +
+                "\n\nOpen the VLC download page now?",
+                "VLC Redesign needs VLC", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (r == MessageBoxResult.Yes)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.videolan.org/vlc/") { UseShellExecute = true });
+            Shutdown(1);
+            return;
+        }
         catch (Exception ex)
         {
             LogError(ex);

@@ -1,0 +1,130 @@
+# Builds VLC Redesign from source and publishes a GitHub release.
+#
+# Trigger: push a tag like v1.2.3 (or run it manually with a version).
+# Output:  a GitHub release with two exes (self-contained and small) and SHA256SUMS.txt, plus a
+#          "store-msix" build artifact for uploading to Partner Center (unsigned MSIX packages
+#          can't be installed by downloaders, so it isn't attached to the release).
+#
+# Code signing (SignPath Foundation, free for open source) switches on by itself once these
+# exist in the repo settings (Settings → Secrets and variables → Actions):
+#   variables: SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG
+#   secret:    SIGNPATH_API_TOKEN
+# Until then the exes are released unsigned. See vlc-redesign/CODE_SIGNING.md.
+#
+# Store identity (from Partner Center → Product identity) for the MSIX, as variables:
+#   STORE_IDENTITY_NAME, STORE_PUBLISHER, STORE_PUBLISHER_DISPLAY_NAME, STORE_DISPLAY_NAME
+
+name: VLC Redesign release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (e.g. 1.0.1)"
+        required: true
+      publish:
+        description: "Publish the GitHub release (off = dry run, artifacts only)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: vlc-redesign
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Version
+        id: v
+        run: |
+          $v = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ github.event.inputs.version }}" } else { "${{ github.ref_name }}".TrimStart("v") }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version must look like 1.2.3, got '$v'" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build exes
+        run: |
+          $v = "${{ steps.v.outputs.version }}"
+          dotnet publish player/RedesignPlayer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:Version=$v -o build/sc
+          dotnet publish player/RedesignPlayer.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true `
+            -p:DebugType=none -p:Version=$v -o build/fd
+          New-Item -ItemType Directory -Force build/unsigned | Out-Null
+          Copy-Item "build/sc/VLC Redesign.exe" "build/unsigned/VLC-Redesign-$v-win-x64.exe"
+          Copy-Item "build/fd/VLC Redesign.exe" "build/unsigned/VLC-Redesign-$v-win-x64-small.exe"
+
+      - name: Build Store package (MSIX)
+        run: |
+          $a = @{ Version = "${{ steps.v.outputs.version }}.0" }
+          if ("${{ vars.STORE_IDENTITY_NAME }}") {
+            $a.IdentityName = "${{ vars.STORE_IDENTITY_NAME }}"
+            $a.Publisher = "${{ vars.STORE_PUBLISHER }}"
+            $a.PublisherDisplayName = "${{ vars.STORE_PUBLISHER_DISPLAY_NAME }}"
+          }
+          if ("${{ vars.STORE_DISPLAY_NAME }}") { $a.DisplayName = "${{ vars.STORE_DISPLAY_NAME }}" }
+          ./packaging/msix/build-msix.ps1 @a
+
+      - name: Upload Store package
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-msix
+          path: vlc-redesign/build/msix/*.msix
+          if-no-files-found: error
+
+      - name: Upload unsigned exes
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-exes
+          path: vlc-redesign/build/unsigned/*.exe
+          if-no-files-found: error
+
+      - name: Sign exes (SignPath)
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: vlc-redesign/build/signed
+
+      - name: Collect release files
+        run: |
+          New-Item -ItemType Directory -Force build/release | Out-Null
+          $exes = if (Test-Path build/signed) { "build/signed" } else { "build/unsigned" }
+          Copy-Item "$exes/*.exe" build/release/
+          Push-Location build/release
+          Get-ChildItem -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLower(), $_.Name } |
+            Set-Content SHA256SUMS.txt -Encoding ascii
+          Pop-Location
+          Get-ChildItem build/release | Format-Table Name, Length
+
+      - name: Upload release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: vlc-redesign/build/release/*
+
+      - name: Publish GitHub release
+        if: ${{ github.event_name == 'push' || github.event.inputs.publish == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v${{ steps.v.outputs.version }}"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag build/release/* --clobber }
+          else { gh release create $tag build/release/* --title "VLC Redesign ${{ steps.v.outputs.version }}" --generate-notes --target ${{ github.sha }} }

@@ -36,10 +36,12 @@ public sealed class VlcConfig
         }
     }
 
+    public sealed class VlcMissingException() : Exception(
+        "VLC Redesign plays media with VLC media player's engine, but VLC isn't installed (or isn't the 64-bit version 3).");
+
     public static VlcConfig Load()
     {
-        var dir = FindInstallDir() ?? throw new InvalidOperationException(
-            "Couldn't find a VLC installation. Install VLC 3 (64-bit) or set VLC_DIR.");
+        var dir = FindInstallDir() ?? throw new VlcMissingException();
         var rc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "vlc", "vlcrc");
         return new VlcConfig(dir, rc);
     }

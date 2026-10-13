@@ -22,6 +22,22 @@ public static class ShellIntegration
 
     static string Exe => Environment.ProcessPath!;
 
+    /// <summary>
+    /// True when running as an MSIX/Store package. Packages declare their file types in the
+    /// manifest instead (and their registry writes are virtualized), so registration is skipped.
+    /// </summary>
+    public static bool IsPackaged
+    {
+        get
+        {
+            try { uint len = 0; return GetCurrentPackageFullName(ref len, null) != 15700 /* APPMODEL_ERROR_NO_PACKAGE */; }
+            catch (EntryPointNotFoundException) { return false; }
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetCurrentPackageFullName(ref uint length, System.Text.StringBuilder? name);
+
     public static bool IsRegistered()
     {
         using var k = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ProgId}\shell\open\command");
