@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.IO;
 using Microsoft.Win32;
 
 namespace RedesignPlayer.Core;
@@ -10,7 +11,8 @@ namespace RedesignPlayer.Core;
 public static class ShellIntegration
 {
     const string ProgId = "VLCRedesign.Media";
-    const string AppKey = @"Software\Classes\Applications\VLC Redesign.exe";
+    // Keyed by the exe's file name, whatever the download was renamed to.
+    static string AppKey => $@"Software\Classes\Applications\{Path.GetFileName(Exe)}";
 
     public static readonly string[] Extensions =
     {

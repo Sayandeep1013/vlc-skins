@@ -12,16 +12,16 @@ It isn't a skin. It's a real player built on libVLC, so it plays everything VLC 
 |---|---|
 | ![Music](screenshots/music.jpg) | ![Fullscreen](screenshots/fullscreen.jpg) |
 
-| Queue | Player settings |
-|---|---|
-| ![Queue](screenshots/queue.jpg) | ![Settings](screenshots/settings.jpg) |
+| Seek preview | Queue | Player settings |
+|---|---|---|
+| ![Seek preview](screenshots/seek-preview.jpg) | ![Queue](screenshots/queue.jpg) | ![Settings](screenshots/settings.jpg) |
 
 ## Features
 
 **From the redesign**
 - Dark neutral greys with VLC's orange cone, rounded window corners, and an orange play/pause pill.
 - The bars stay out of the way. They slide in when you move the mouse and slide away after a couple of seconds. They stay up while paused or while the pointer is on them.
-- A thick seek bar with a time preview on hover. VLC's volume wedge becomes a full green-to-orange cone that goes up to your VLC maximum (125% by default).
+- A thick seek bar with YouTube-style previews. Hovering or dragging shows a frame from that point, with its time and chapter name. Frames come from a hidden, silent second player: a storyboard across the whole file first (coarse to fine, so previews show up within a second or two), then the exact frame wherever you pause the pointer. VLC's volume wedge becomes a full green-to-orange cone that goes up to your VLC maximum (125% by default).
 - The title is always at the top. All the menus are behind a single `⋯` button and a dark right-click menu.
 - Audio and subtitle pickers right on the bar, including the audio output device.
 - A player-settings sidebar with Playback, Subtitles, Audio and Video tabs: speed, chapters, subtitle and audio delay, tracks, aspect ratio, snapshot.
@@ -81,9 +81,10 @@ Layout of the code:
 | `player/MainWindow.xaml(.cs)` | Window, bars, fullscreen controller, menus, sidebar, queue, music view, hotkey actions |
 | `player/Core/Player.cs` | libVLC setup and the queue |
 | `player/Core/VlcConfig.cs`, `HotKeys.cs` | Finds VLC, reads `vlcrc`, matches key presses to VLC's hotkey names |
+| `player/Core/Thumbnails.cs` | Seek-bar preview frames (storyboard + exact frames on demand) |
 | `player/Core/Waveform.cs` | Decodes audio with libVLC into peaks for the waveform seek bar |
 | `player/Core/ShellIntegration.cs` | Explorer *Open with* registration (HKCU) |
-| `player/UI/Controls.cs` | Seek bar (incl. waveform), cone volume, icons |
+| `player/UI/Controls.cs` | Seek bar (incl. waveform and preview card), cone volume, icons |
 
 ## The skin (earlier version)
 
@@ -98,7 +99,7 @@ Copy the `.vlt` into VLC's `skins` folder, then Tools → Preferences → Interf
 
 ## Not built yet
 
-Parts of the redesign that aren't here yet: the library/home screen, the subtitle timeline, the rebuilt preferences window, onboarding, and thumbnails on the seek bar.
+Parts of the redesign that aren't here yet: the library/home screen, the subtitle timeline, the rebuilt preferences window, and onboarding.
 
 ## Credits & licenses
 

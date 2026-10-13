@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace RedesignPlayer.UI;
 
@@ -39,7 +40,11 @@ public sealed class IconView : FrameworkElement
     }
 }
 
-/// <summary>The redesign's thick seek bar: dark track, brown fill, orange pill handle, time preview on hover.</summary>
+/// <summary>What the seek bar's hover card shows for a position.</summary>
+public sealed record SeekPreview(ImageSource? Image, string Time, string? Chapter = null);
+
+/// <summary>The redesign's thick seek bar: dark track, brown fill, orange pill handle, and a
+/// YouTube-style preview card (frame, chapter, time) while hovering or dragging.</summary>
 public sealed class SeekBar : FrameworkElement
 {
     static readonly Brush TrackBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x05, 0x05, 0x05)));
@@ -59,21 +64,105 @@ public sealed class SeekBar : FrameworkElement
 
     /// <summary>Raised with the new position (0..1) while dragging and on release.</summary>
     public event Action<double, bool>? Seek; // (position, final)
-    /// <summary>Raised to ask for a hover label (position 0..1 -> text).</summary>
-    public Func<double, string>? HoverText;
+    /// <summary>Asked for the preview card's content at a position (0..1).</summary>
+    public Func<double, SeekPreview>? Preview;
+    /// <summary>Width of the preview frame in DIPs; its height follows the image's aspect.</summary>
+    public double PreviewWidth { get; set; } = 176;
+    /// <summary>Element whose top edge the card should float above (the bar or dock holding this).</summary>
+    public FrameworkElement? PreviewAbove { get; set; }
 
     float[]? _peaks;
     /// <summary>Waveform peaks (0..1). When set, the bar draws the redesign's waveform seek bar.</summary>
     public float[]? Peaks { get => _peaks; set { _peaks = value; InvalidateVisual(); } }
 
-    readonly ToolTip _tip = new() { Placement = System.Windows.Controls.Primitives.PlacementMode.Relative, StaysOpen = true };
+    // Preview card: a borderless popup above the bar that never takes the mouse.
+    readonly System.Windows.Controls.Primitives.Popup _card = new()
+    {
+        AllowsTransparency = true, StaysOpen = true, IsHitTestVisible = false, Focusable = false,
+        Placement = System.Windows.Controls.Primitives.PlacementMode.Relative,
+    };
+    readonly Border _cardRoot, _frame;
+    readonly Image _img = new() { Stretch = Stretch.UniformToFill };
+    readonly TextBlock _chapter, _time;
+    const double CardMargin = 14; // room for the shadow around the card
 
     public SeekBar()
     {
         Height = 28;
         Cursor = Cursors.Hand;
-        ToolTipService.SetIsEnabled(this, false);
-        _tip.PlacementTarget = this;
+        RenderOptions.SetBitmapScalingMode(_img, BitmapScalingMode.HighQuality);
+        _frame = new Border { CornerRadius = new CornerRadius(8), Child = _img, Background = Brushes.Black };
+        _chapter = new TextBlock { FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(0xB8, 0xB8, 0xB8)), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(6, 7, 6, 0) };
+        _time = new TextBlock { FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8, 5, 8, 2) };
+        var stack = new StackPanel();
+        stack.Children.Add(_frame); stack.Children.Add(_chapter); stack.Children.Add(_time);
+        _cardRoot = new Border
+        {
+            Child = stack, Margin = new Thickness(CardMargin), Padding = new Thickness(4),
+            Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x14, 0x14)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0x2E, 0x2E)), BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 4, Opacity = 0.5, Direction = 270 },
+        };
+        _card.Child = _cardRoot;
+        _card.PlacementTarget = this;
+    }
+
+    /// <summary>Re-reads the card content (e.g. when a better frame has arrived).</summary>
+    public void RefreshPreview() { if (_hover != null && _card.IsOpen) UpdateCard(); }
+
+    public void HidePreview() => _card.IsOpen = false;
+
+    // Debug bridge: pretend the pointer is at a position (null = gone), and expose the card.
+    public void DebugHover(double? pos) { _hover = pos; if (pos == null) _card.IsOpen = false; else UpdateCard(); InvalidateVisual(); }
+    public FrameworkElement? OpenCard => _card.IsOpen ? _cardRoot : null;
+
+    void UpdateCard()
+    {
+        if (_hover is not double hv || Preview == null || !Enabled) { _card.IsOpen = false; return; }
+        var p = Preview(hv);
+        _time.Text = p.Time;
+        _chapter.Text = p.Chapter ?? "";
+        _chapter.Visibility = string.IsNullOrEmpty(p.Chapter) ? Visibility.Collapsed : Visibility.Visible;
+        if (p.Image is BitmapSource bmp && bmp.PixelWidth > 0)
+        {
+            _img.Source = bmp;
+            _frame.Width = PreviewWidth;
+            _frame.Height = Math.Round(PreviewWidth * bmp.PixelHeight / bmp.PixelWidth);
+            _frame.Clip = new RectangleGeometry(new Rect(0, 0, _frame.Width, _frame.Height), 8, 8);
+            _frame.Visibility = Visibility.Visible;
+            _cardRoot.Padding = new Thickness(4);
+        }
+        else
+        {
+            _frame.Visibility = Visibility.Collapsed;
+            _cardRoot.Padding = new Thickness(6, 2, 6, 2);
+        }
+        _cardRoot.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double cw = _cardRoot.DesiredSize.Width, ch = _cardRoot.DesiredSize.Height; // includes the shadow margin
+        // Centred on the pointer, but kept within the bar's ends (like YouTube's player edges).
+        double x = 6 + hv * (ActualWidth - 12) - cw / 2;
+        _card.HorizontalOffset = Math.Clamp(x, -CardMargin - 8, Math.Max(-CardMargin, ActualWidth - cw + CardMargin + 8)) + _shift.X;
+        double lift = PreviewAbove != null && PreviewAbove.IsAncestorOf(this) ? TranslatePoint(new Point(), PreviewAbove).Y : 0;
+        _card.VerticalOffset = -ch + CardMargin - 10 - lift + _shift.Y;
+        _card.IsOpen = true;
+        CorrectCardPlacement();
+    }
+
+    // WPF positions a popup by its rendered bounds, which include the drop shadow, so the card
+    // lands a shadow's width off. Measure where it really is once and remember the correction.
+    Vector _shift;
+    void CorrectCardPlacement()
+    {
+        if (PresentationSource.FromVisual(_cardRoot) == null) return;
+        _cardRoot.UpdateLayout();
+        var actual = PointFromScreen(_cardRoot.PointToScreen(new Point(0, 0)));
+        var wanted = new Point(_card.HorizontalOffset - _shift.X + CardMargin, _card.VerticalOffset - _shift.Y + CardMargin);
+        var err = wanted - actual;
+        if (Math.Abs(err.X) < 0.75 && Math.Abs(err.Y) < 0.75) return;
+        _shift += err;
+        _card.HorizontalOffset += err.X;
+        _card.VerticalOffset += err.Y;
     }
 
     public double Value
@@ -88,17 +177,15 @@ public sealed class SeekBar : FrameworkElement
     {
         _hover = At(e);
         if (_dragging) { _value = _hover.Value; Seek?.Invoke(_value, false); }
-        if (Enabled && HoverText != null)
-        {
-            _tip.Content = HoverText(_hover.Value);
-            _tip.HorizontalOffset = 6 + _hover.Value * (ActualWidth - 12) - 24;
-            _tip.VerticalOffset = -34;
-            _tip.IsOpen = true;
-        }
+        UpdateCard();
         InvalidateVisual();
     }
 
-    protected override void OnMouseLeave(MouseEventArgs e) { _hover = null; _tip.IsOpen = false; InvalidateVisual(); }
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        if (_dragging) return; // keep the card while scrubbing outside the bar
+        _hover = null; _card.IsOpen = false; InvalidateVisual();
+    }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
@@ -118,6 +205,7 @@ public sealed class SeekBar : FrameworkElement
         ReleaseMouseCapture();
         _value = At(e);
         Seek?.Invoke(_value, true);
+        if (!IsMouseOver) { _hover = null; _card.IsOpen = false; } // released away from the bar
         InvalidateVisual();
         e.Handled = true;
     }

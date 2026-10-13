@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using LibVLCSharp.Shared;
+using LibVLCSharp.Shared.Structures;
 using Microsoft.Win32;
 using RedesignPlayer.Core;
 using RedesignPlayer.UI;
@@ -58,7 +59,8 @@ public partial class MainWindow : Window
         Volume.Value = _volume;
         Volume.Changed += v => SetVolume((int)v, osd: false);
         Seek.Seek += OnSeek;
-        Seek.HoverText = p => _player.Mp.Length > 0 ? Fmt.Time((long)(p * _player.Mp.Length)) : "";
+        Seek.Preview = SeekPreviewAt;
+        _thumbDwell.Tick += (_, _) => { _thumbDwell.Stop(); _thumbs?.Request(_thumbWant); };
         QueueList.ItemsSource = _player.Queue;
         _player.Queue.CollectionChanged += (_, e) =>
         {
@@ -199,8 +201,10 @@ public partial class MainWindow : Window
                 // Exact overlay (and open menu) pixels, for composing with a capture of the video.
                 RenderPng(Overlay, arg + "_overlay.png");
                 if (_openMenu is { IsOpen: true } om) RenderPng(om, arg + "_menu.png");
+                if (Seek.OpenCard is { } card) RenderPng(card, arg + "_card.png");
                 if (_openMenu != null) File.WriteAllText(arg + "_menu.txt", MenuScreenPos(_openMenu));
                 break;
+            case "hover": Seek.DebugHover(arg == "off" ? null : double.Parse(arg, System.Globalization.CultureInfo.InvariantCulture)); break;
             case "key":
                 // "key Right": runs a key press through the same handler as real keyboard input.
                 var kk = (Key)Enum.Parse(typeof(Key), arg);
@@ -229,6 +233,8 @@ public partial class MainWindow : Window
                     $"window={Left:0},{Top:0} {ActualWidth:0}x{ActualHeight:0} state={WindowState} fs={_fullscreen} snapped={IsSnapped()} square={_squareCorners}",
                     $"overlayWindow={_overlayWindow?.GetType().Name} at {_overlayWindow?.Left:0},{_overlayWindow?.Top:0} {_overlayWindow?.Width:0}x{_overlayWindow?.Height:0} actual {_overlayWindow?.ActualWidth:0}x{_overlayWindow?.ActualHeight:0} side={Side.Visibility} menu={_openMenu?.IsOpen}",
                     $"overlayGrid={Overlay.ActualWidth:0}x{Overlay.ActualHeight:0} chrome={Chrome.ActualWidth:0}x{Chrome.ActualHeight:0} video={Video.ActualWidth:0}x{Video.ActualHeight:0} main={ActualWidth:0}x{ActualHeight:0}",
+                    $"card={(Seek.OpenCard is { } oc ? $"{oc.PointToScreen(new Point(0, 0)).X:0}..{oc.PointToScreen(new Point(oc.ActualWidth, 0)).X:0} w={oc.ActualWidth:0}" : "closed")} seek0={Seek.PointToScreen(new Point(0, 0)).X:0} seekW={Seek.ActualWidth:0} handle={Seek.PointToScreen(new Point(6 + Seek.Value * (Seek.ActualWidth - 12), 0)).X:0}",
+                    $"thumbs={_thumbs?.Count} {_thumbs?.PixelWidth}x{_thumbs?.PixelHeight} chapters={_chapters.Length}",
                     $"spu={mp.Spu} spuCount={mp.SpuCount} audio={mp.AudioTrack} audioCount={mp.AudioTrackCount} dev={mp.OutputDevice}",
                 }));
                 break;
@@ -298,6 +304,7 @@ public partial class MainWindow : Window
         _settings.Volume = _volume;
         _settings.Save();
         _tick.Stop();
+        DropThumbnails();
         _player.Dispose();
     }
 
@@ -325,6 +332,7 @@ public partial class MainWindow : Window
         BottomBar.CornerRadius = square ? new CornerRadius(0) : new CornerRadius(0, 0, 8, 8);
         // Fullscreen has no top bar at all: just the video and the floating controller.
         TopBar.Visibility = _fullscreen ? Visibility.Collapsed : Visibility.Visible;
+        Seek.PreviewAbove = _fullscreen ? Dock : BottomBar;
         if (_fullscreen == (Dock.Visibility == Visibility.Visible)) return;
         if (_fullscreen)
         {
@@ -506,6 +514,7 @@ public partial class MainWindow : Window
         _chromeShown = false;
         Chrome.IsHitTestVisible = false;
         CloseToolTips();
+        Seek.HidePreview();
         CursorMoved(); // remember where the pointer rests; only moving it shows the bars again
         AnimateChrome(show: false);
         if (Overlay.IsMouseOver) Overlay.Cursor = Cursors.None;
@@ -633,6 +642,7 @@ public partial class MainWindow : Window
         PlayButton.ToolTip = (mp.IsPlaying ? "Pause" : "Play") + KeyHint("play-pause");
         TitleText.Text = _player.HasMedia ? _player.Title : "VLC Redesign";
         UpdateMusicMode(has);
+        EnsureThumbnails(has);
         DockTitle.Text = TitleText.Text;
         Title = _player.HasMedia ? _player.Title + " — VLC Redesign" : "VLC Redesign";
         MuteIcon.Data = (Geometry)FindResource(mp.Mute ? "Icon.Muted" : "Icon.Volume");
@@ -650,6 +660,58 @@ public partial class MainWindow : Window
         Overlay.Cursor = null;
         Chrome.IsHitTestVisible = true;
         AnimateChrome(show: true);
+    }
+
+    // ------------------------------------------------------------------ seek previews
+
+    Thumbnails? _thumbs;
+    QueueItem? _thumbsFor;
+    ChapterDescription[] _chapters = Array.Empty<ChapterDescription>();
+    readonly DispatcherTimer _thumbDwell = new() { Interval = TimeSpan.FromMilliseconds(120) };
+    long _thumbWant;
+
+    // Start the frame grabber once a local video is actually playing (its size is known then).
+    void EnsureThumbnails(bool has)
+    {
+        var mp = _player.Mp;
+        var item = _player.CurrentItem;
+        if (_thumbs != null || !has || _musicMode || item == null || _thumbsFor == item) return;
+        if (mp.State != VLCState.Playing || !mp.IsSeekable || mp.Length <= 0 || mp.VideoTrackCount <= 0 || !File.Exists(item.Mrl)) return;
+        uint w = 0, h = 0;
+        if (!mp.Size(0, ref w, ref h) || w == 0 || h == 0) return;
+        _thumbsFor = item;
+        try
+        {
+            _chapters = mp.FullChapterDescriptions(-1) ?? Array.Empty<ChapterDescription>();
+            double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+            _thumbs = new Thumbnails(_player.LibVlc, item.Mrl, mp.Length, (double)w / h, (int)Math.Ceiling(Seek.PreviewWidth * dpi));
+            _thumbs.Updated += () => Dispatcher.BeginInvoke(Seek.RefreshPreview, DispatcherPriority.Background);
+        }
+        catch (Exception ex) { App.LogError(ex); _thumbs = null; }
+    }
+
+    void DropThumbnails()
+    {
+        _thumbDwell.Stop();
+        _thumbs?.Dispose();
+        _thumbs = null;
+        _thumbsFor = null;
+        _chapters = Array.Empty<ChapterDescription>();
+        Seek.HidePreview();
+    }
+
+    SeekPreview SeekPreviewAt(double pos)
+    {
+        long len = _player.Mp.Length;
+        if (len <= 0) return new SeekPreview(null, "");
+        long ms = (long)(pos * len);
+        // Show the nearest frame now; ask for the exact one once the pointer settles.
+        _thumbWant = ms;
+        _thumbDwell.Stop(); _thumbDwell.Start();
+        string? chapter = null;
+        if (_chapters.Length > 1)
+            foreach (var c in _chapters) if (c.TimeOffset <= ms) chapter = c.Name;
+        return new SeekPreview(_thumbs?.Get(ms), Fmt.Time(ms), string.IsNullOrWhiteSpace(chapter) ? null : chapter);
     }
 
     // ------------------------------------------------------------------ music
@@ -738,6 +800,7 @@ public partial class MainWindow : Window
 
     void OnMediaChanged()
     {
+        DropThumbnails();
         _musicMode = false;
         MusicView.Visibility = Visibility.Collapsed;
         StopWaveform();
