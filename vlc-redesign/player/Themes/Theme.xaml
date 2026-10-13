@@ -305,6 +305,112 @@
     </Setter>
   </Style>
 
+  <!-- Chip: one choice among a few (rotation, crop ratio, zoom, stereo mode, deinterlace). -->
+  <Style x:Key="Chip" TargetType="ToggleButton">
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Margin" Value="0,0,6,6"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="#232323" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="14" Padding="11,5">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#2C2C2C"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#3A2210"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+              <Setter Property="Foreground" Value="#FFD2A8"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Effect tile: a toggleable filter with a colour swatch (Tag = swatch brush). -->
+  <Style x:Key="FxTile" TargetType="ToggleButton">
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="FontSize" Value="11.5"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Margin" Value="3"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="#1F1F1F" BorderBrush="#2A2A2A" BorderThickness="1" CornerRadius="10" Padding="8,9,8,8">
+            <StackPanel>
+              <Border Width="30" Height="30" CornerRadius="8" Background="{TemplateBinding Tag}" HorizontalAlignment="Center"/>
+              <ContentPresenter HorizontalAlignment="Center" Margin="0,6,0,0"/>
+            </StackPanel>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#262626"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#2E1C0E"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+              <Setter Property="Foreground" Value="#FFD2A8"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- One cell of the 3×3 overlay position picker. -->
+  <Style x:Key="PosCell" TargetType="ToggleButton">
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="#232323" CornerRadius="4">
+            <Ellipse x:Name="Dot" Width="6" Height="6" Fill="#555555"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#2E2E2E"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#3A2210"/>
+              <Setter TargetName="Dot" Property="Fill" Value="{StaticResource Accent}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Quiet text button (Reset, nudges). -->
+  <Style x:Key="TextButton" TargetType="Button">
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="FontSize" Value="11.5"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="7,3">
+            <ContentPresenter/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#262626"/>
+              <Setter Property="Foreground" Value="{StaticResource IconHi}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- Collapsible section header in the effects / info panels. -->
   <Style x:Key="SectionHeader" TargetType="ToggleButton">
     <Setter Property="Foreground" Value="{StaticResource IconHi}"/>

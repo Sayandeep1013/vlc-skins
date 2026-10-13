@@ -13,7 +13,7 @@
     <RootNamespace>RedesignPlayer</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\cone.ico</ApplicationIcon>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <!-- The UI is English; skip WPF's translated resource DLLs (smaller downloads). -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Product>VLC Redesign</Product>

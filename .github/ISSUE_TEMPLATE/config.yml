@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Download VLC Redesign
+    url: https://github.com/Sayandeep1013/vlc-skins/releases/latest
+    about: Get the latest release (Windows 10/11, needs VLC 3 64-bit installed).

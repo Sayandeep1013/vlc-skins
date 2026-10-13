@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest something VLC Redesign should do.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome. It helps to check the "Not built yet" list in the [README](https://github.com/Sayandeep1013/vlc-skins/blob/main/vlc-redesign/README.md#not-built-yet) first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or situation behind the idea.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+      description: Describe the feature. If it's something classic VLC or Juxtopposed's redesign already does, say where.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Anything you've tried or considered.
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Mockups, screenshots, links.
+    validations:
+      required: false

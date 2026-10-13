@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in VLC Redesign doesn't work as it should.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! VLC Redesign is an independent project, not affiliated with VideoLAN. If the same problem happens in regular VLC too, it's probably a VLC issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we make it happen? Mention the kind of file (e.g. MKV with subtitles, MP3, network stream) if it matters.
+      placeholder: |
+        1. Open a video file
+        2. Press ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: VLC Redesign version
+      description: From the release you downloaded, e.g. 1.1.0. Say whether it's the full exe or the `-small` one.
+      placeholder: "1.1.0 (full exe)"
+    validations:
+      required: true
+  - type: input
+    id: vlc-version
+    attributes:
+      label: VLC version
+      description: In classic VLC, Help → About. VLC Redesign needs VLC 3 (64-bit).
+      placeholder: "3.0.21 64-bit"
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Press Win+R, type `winver`.
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots and logs
+      description: |
+        Drag screenshots in here if they help. For logs, attach `%TEMP%\vlc-redesign-player.log` (paste that path into Explorer's address bar), and/or the engine log from the `⋯` menu → Tools → Messages (Ctrl+M) → Copy.
+    validations:
+      required: false

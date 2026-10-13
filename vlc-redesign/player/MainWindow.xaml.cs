@@ -240,6 +240,9 @@ public partial class MainWindow : Window
             case "info": OpenInfo(arg switch { "codec" => InfoTabCodec, "stats" => InfoTabStats, _ => InfoTabGeneral }); break;
             case "log": OpenLog(); if (arg == "debug") SetLogVerbosity(2); break;
             case "ontop": ToggleOnTop(); break;
+            case "fxexpand": _fxExpanded[arg] = true; BuildEffects(); break;
+            case "fxscroll": FxScroll.ScrollToVerticalOffset(double.Parse(arg, System.Globalization.CultureInfo.InvariantCulture)); break;
+            case "title": _player.Mp.Media?.SetMeta(MetadataType.Title, arg); UpdateUi(); break; // in memory only (not saved)
             case "metasave": { var m = _player.Mp.Media!; m.SetMeta(MetadataType.Artist, arg); File.WriteAllText(Environment.GetEnvironmentVariable("VLC_REDESIGN_DEBUG") + ".meta", m.SaveMeta().ToString()); break; }
             case "measure":
             {
@@ -1408,7 +1411,10 @@ public partial class MainWindow : Window
             {
                 new { Name = "Open file", Keys = "Ctrl+O" }, new { Name = "Open folder", Keys = "Ctrl+F" },
                 new { Name = "Network stream", Keys = "Ctrl+N" }, new { Name = "Queue", Keys = "Ctrl+L" },
-                new { Name = "Player settings", Keys = "Ctrl+E" }, new { Name = "This list", Keys = "F1" },
+                new { Name = "Effects and filters", Keys = "Ctrl+E" }, new { Name = "Media information", Keys = "Ctrl+I" },
+                new { Name = "Codec information", Keys = "Ctrl+J" }, new { Name = "Messages", Keys = "Ctrl+M" },
+                new { Name = "VLC preferences", Keys = "Ctrl+P" }, new { Name = "Jump to time", Keys = "Ctrl+T" },
+                new { Name = "Player settings", Keys = "Ctrl+Shift+E" }, new { Name = "This list", Keys = "F1" },
             }).ToList();
         KeysList.ItemsSource = rows;
     }

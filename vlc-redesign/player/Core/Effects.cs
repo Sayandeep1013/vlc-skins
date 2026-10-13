@@ -256,16 +256,27 @@ public sealed class EffectsEngine
         ApplyDeinterlace();
     }
 
-    /// <summary>Live parameter change. Most video filters read their values when the chain is
-    /// built, so the chain is rebuilt unless the variable is a live (command) variable.</summary>
-    public void SetVideoParam(Param p, double v)
+    /// <summary>
+    /// Pushes one video parameter. Filters that support live changes expose their parameters on
+    /// the video output (VLC proxies "command" variables), so setting it there takes effect on the
+    /// next frame. Returns false when some output doesn't have it: then the filter only reads the
+    /// value when the chain is built, and the caller should <see cref="RebuildVideoChain"/>.
+    /// </summary>
+    public bool SetVideoParam(Param p, double v)
     {
         _s.Values[p.Var] = v;
-        SetVideo(p.Var, p.Type, v);
-        bool live = p.Var is "brightness" or "contrast" or "hue" or "saturation" or "gamma" or "rotate-angle" or "sharpen-sigma"
-            or "grain-variance" or "sepia-intensity" or "posterize-level" or "gradient-type" or "blur-factor" or "gaussianblur-sigma";
-        if (!live) SetVideo("video-filter", VlcVars.String, VideoFilterString());
+        VlcVars.Set(Handle, p.Var, p.Type, v);
+        int outputs = 0, live = 0;
+        VlcVars.ForEach(Handle, VlcVars.VideoOutput, o =>
+        {
+            outputs++;
+            if (VlcVars.Exists(o, p.Var)) { VlcVars.Set(o, p.Var, p.Type, v); live++; }
+        });
+        return outputs == 0 || live == outputs;
     }
+
+    /// <summary>Rebuilds the filter chain on live outputs so filters re-read their settings.</summary>
+    public void RebuildVideoChain() => SetVideo("video-filter", VlcVars.String, VideoFilterString());
 
     public void ApplyDeinterlace()
     {
