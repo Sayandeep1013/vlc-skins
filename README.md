@@ -1,6 +1,16 @@
 # VLC Skins
 
-Curated VLC skin experiments and tested skin builds.
+VLC skins and VLC look-and-feel experiments, including **VLC Redesign**, a standalone player built on VLC's engine from Juxtopposed's redesign.
+
+## VLC Redesign (player)
+
+A Windows media player that brings [Juxtopposed's VLC redesign](https://youtu.be/ERFeOgqk324) to life on top of your installed VLC. It uses VLC's engine, your VLC settings and your hotkeys, with auto-hiding bars, a fullscreen floating controller, a music view with a waveform seek bar, dark menus, a settings sidebar, a queue, and Explorer *Open with* integration.
+
+**[Download](https://github.com/Sayandeep1013/vlc-skins/releases/latest)** · [Details, build and credits](vlc-redesign/README.md)
+
+![VLC Redesign](vlc-redesign/screenshots/player.jpg)
+
+The earlier VLC Redesign *skin* (`vlc-redesign/dist/VLC-Redesign.vlt`) is still included; see the [project README](vlc-redesign/README.md#the-skin-earlier-version).
 
 ## Included Skins
 

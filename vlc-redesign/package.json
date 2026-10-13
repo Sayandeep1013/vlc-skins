@@ -1,0 +1,13 @@
+{
+  "name": "vlc-redesign-skin",
+  "private": true,
+  "description": "VLC skins2 skin based on Juxtopposed's VLC redesign (CC BY 4.0)",
+  "scripts": {
+    "build": "node src/build.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "fflate": "^0.8.2",
+    "lucide-static": "^0.460.0"
+  }
+}

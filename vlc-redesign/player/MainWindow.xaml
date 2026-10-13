@@ -1,0 +1,356 @@
+<Window x:Class="RedesignPlayer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
+        xmlns:ui="clr-namespace:RedesignPlayer.UI"
+        Title="VLC Redesign" Width="1120" Height="680" MinWidth="720" MinHeight="420"
+        WindowStyle="None" ResizeMode="CanResize" Background="#000000"
+        FontFamily="{StaticResource Inter}" Icon="Assets/cone.ico">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+
+  <vlc:VideoView x:Name="Video" Background="#000000">
+    <!-- Everything below lives in libvlc's transparent overlay window, so it floats over the
+         video. The 1/255 alpha background makes the whole area receive mouse input. -->
+    <Grid x:Name="Overlay" Background="#01000000" AllowDrop="True"
+          TextElement.FontFamily="{StaticResource Inter}" TextElement.Foreground="{StaticResource Text}"
+          MouseMove="Overlay_MouseMove" MouseLeave="Overlay_MouseLeave" MouseWheel="Overlay_MouseWheel"
+          PreviewMouseLeftButtonDown="Overlay_PreviewMouseLeftButtonDown" MouseLeftButtonDown="Overlay_MouseLeftButtonDown"
+          MouseRightButtonUp="Overlay_MouseRightButtonUp" Drop="Overlay_Drop" DragOver="Overlay_DragOver">
+
+      <!-- Opaque cover over the video area until libvlc has real frames on screen. libvlc's video
+           windows are created with a light system background, so without this a white flash
+           shows while a file loads. The overlay window sits above them, so this always wins. -->
+      <Border x:Name="Curtain" Background="#000000" IsHitTestVisible="False"/>
+
+      <!-- Empty state -->
+      <StackPanel x:Name="Idle" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <Viewbox Width="96" Height="96">
+          <Canvas Width="100" Height="100">
+            <Path Data="M42 8h16l5.5 20h-27z" Fill="#3A3A3A"/>
+            <Path Data="M34.5 36h31l6 22h-43z" Fill="#3A3A3A"/>
+            <Path Data="M26.5 66h47l5.2 19H21.3z" Fill="#3A3A3A"/>
+            <Rectangle Canvas.Left="10" Canvas.Top="86" Width="80" Height="9" RadiusX="3" RadiusY="3" Fill="#2A2A2A"/>
+          </Canvas>
+        </Viewbox>
+        <TextBlock Text="Drop a video here" FontSize="16" Foreground="{StaticResource TextDim}" HorizontalAlignment="Center" Margin="0,18,0,4"/>
+        <TextBlock x:Name="IdleHint" Text="or press Ctrl+O to open a file" FontSize="12.5" Foreground="{StaticResource TextFaint}" HorizontalAlignment="Center"/>
+        <Button Content="Open file" Style="{StaticResource FlatButton}" Margin="0,16,0,0" HorizontalAlignment="Center" Click="OpenFile_Click"/>
+      </StackPanel>
+
+      <!-- Music: songs look different from videos: big cover art, title and artist. -->
+      <Grid x:Name="MusicView" Visibility="Collapsed" IsHitTestVisible="False" Background="#000000">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,24">
+          <Border x:Name="CoverFrame" Width="300" Height="300" CornerRadius="18" Background="#161616" Effect="{StaticResource Shadow}">
+            <Grid>
+              <Viewbox Width="110" Height="110">
+                <Canvas Width="100" Height="100">
+                  <Path Data="M42 8h16l5.5 20h-27z" Fill="#3A3A3A"/>
+                  <Path Data="M34.5 36h31l6 22h-43z" Fill="#3A3A3A"/>
+                  <Path Data="M26.5 66h47l5.2 19H21.3z" Fill="#3A3A3A"/>
+                  <Rectangle Canvas.Left="10" Canvas.Top="86" Width="80" Height="9" RadiusX="3" RadiusY="3" Fill="#2A2A2A"/>
+                </Canvas>
+              </Viewbox>
+              <Border x:Name="Cover" CornerRadius="18"/>
+            </Grid>
+          </Border>
+          <TextBlock x:Name="MusicTitle" FontSize="20" Foreground="{StaticResource IconHi}" HorizontalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" MaxWidth="560" Margin="0,24,0,4"/>
+          <TextBlock x:Name="MusicArtist" FontSize="13.5" Foreground="{StaticResource TextDim}" HorizontalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" MaxWidth="560"/>
+        </StackPanel>
+      </Grid>
+
+      <!-- On-screen message (shows the action and the key that triggered it) -->
+      <Border x:Name="Osd" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="18,62,0,0" Opacity="0"
+              Background="#E6181818" CornerRadius="10" Padding="14,9" IsHitTestVisible="False">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock x:Name="OsdText" FontSize="14" Foreground="{StaticResource IconHi}"/>
+          <Border x:Name="OsdKeyBox" Background="#2A2A2A" CornerRadius="5" Padding="7,2" Margin="12,0,0,0" VerticalAlignment="Center">
+            <TextBlock x:Name="OsdKey" FontSize="11.5" Foreground="{StaticResource TextDim}"/>
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <!-- Bars + side panels; fades as a whole. -->
+      <Grid x:Name="Chrome">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top bar -->
+        <!-- Top bar. Slides up out of view when idle; in fullscreen it's a soft scrim, not a bar. -->
+        <Border x:Name="TopBar" Grid.Row="0" Height="36" Background="{StaticResource Bar}" CornerRadius="8,8,0,0"
+                MouseLeftButtonDown="TopBar_MouseLeftButtonDown">
+          <Border.RenderTransform><TranslateTransform x:Name="TopShift"/></Border.RenderTransform>
+          <Border.Resources>
+            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+              <Setter Property="Width" Value="32"/>
+              <Setter Property="Height" Value="30"/>
+            </Style>
+          </Border.Resources>
+          <Grid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0">
+              <Viewbox Width="17" Height="17" Margin="2,0,6,0">
+                <Canvas Width="100" Height="100">
+                  <Path Data="M42 8h16l5.5 20h-27z" Fill="{StaticResource Accent}"/>
+                  <Path Data="M34.5 36h31l6 22h-43z" Fill="{StaticResource Accent}"/>
+                  <Path Data="M26.5 66h47l5.2 19H21.3z" Fill="{StaticResource Accent}"/>
+                  <Rectangle Canvas.Left="10" Canvas.Top="86" Width="80" Height="9" RadiusX="3" RadiusY="3" Fill="#8A8A8A"/>
+                </Canvas>
+              </Viewbox>
+              <Button x:Name="MoreButton" Style="{StaticResource IconButton}" ToolTip="Menu" Click="More_Click">
+                <ui:IconView Data="{StaticResource Icon.More}"/>
+              </Button>
+            </StackPanel>
+            <TextBlock x:Name="TitleText" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
+                       Foreground="#C4C4C4" TextTrimming="CharacterEllipsis" MaxWidth="560" IsHitTestVisible="False"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0">
+              <Button Style="{StaticResource IconButton}" ToolTip="Minimize" Click="Min_Click">
+                <ui:IconView Data="{StaticResource Icon.Minimize}" Size="17"/>
+              </Button>
+              <Button x:Name="MaxButton" Style="{StaticResource IconButton}" ToolTip="Maximize" Click="Max_Click">
+                <ui:IconView x:Name="MaxIcon" Data="{StaticResource Icon.Maximize}" Size="15"/>
+              </Button>
+              <Button x:Name="FsButton" Style="{StaticResource IconButton}" Click="Fullscreen_Click">
+                <ui:IconView x:Name="FsIcon" Data="{StaticResource Icon.Fullscreen}" Size="17"/>
+              </Button>
+              <Button Style="{StaticResource IconButton}" ToolTip="Close" Click="Close_Click">
+                <ui:IconView Data="{StaticResource Icon.Close}" Size="18"/>
+              </Button>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Side panel: player settings / queue / shortcuts -->
+        <Border x:Name="Side" Grid.Row="1" Width="330" HorizontalAlignment="Right" Margin="0,10,10,10"
+                Background="{StaticResource Panel}" CornerRadius="14" Visibility="Collapsed" BorderBrush="#262626" BorderThickness="1">
+          <Grid>
+            <!-- Player settings (the redesign's sidebar) -->
+            <DockPanel x:Name="SettingsPane" Visibility="Collapsed">
+              <Grid DockPanel.Dock="Top" Margin="10,4,10,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <RadioButton x:Name="TabPlayback" Grid.Column="0" Content="Playback" Style="{StaticResource TabButton}" GroupName="tabs" Checked="Tab_Checked" IsChecked="True"/>
+                <RadioButton x:Name="TabSubs" Grid.Column="1" Content="Subtitles" Style="{StaticResource TabButton}" GroupName="tabs" Checked="Tab_Checked"/>
+                <RadioButton x:Name="TabAudio" Grid.Column="2" Content="Audio" Style="{StaticResource TabButton}" GroupName="tabs" Checked="Tab_Checked"/>
+                <RadioButton x:Name="TabVideo" Grid.Column="3" Content="Video" Style="{StaticResource TabButton}" GroupName="tabs" Checked="Tab_Checked"/>
+              </Grid>
+              <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Divider}" Margin="12,0"/>
+              <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,10,14,14">
+                <Grid>
+                  <StackPanel x:Name="PanePlayback">
+                    <TextBlock Text="Speed" Style="{x:Null}" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,6,0,6"/>
+                    <DockPanel>
+                      <Button DockPanel.Dock="Right" Content="Reset" Style="{StaticResource FlatButton}" Padding="10,5" Margin="10,0,0,0" Click="SpeedReset_Click"/>
+                      <TextBlock x:Name="SpeedValue" DockPanel.Dock="Right" Width="46" TextAlignment="Right" VerticalAlignment="Center" FontSize="13"/>
+                      <Slider x:Name="SpeedSlider" Minimum="0.25" Maximum="2" SmallChange="0.05" LargeChange="0.25" Value="1" ValueChanged="SpeedSlider_ValueChanged"/>
+                    </DockPanel>
+                    <TextBlock Text="Chapters" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,18,0,6"/>
+                    <StackPanel Orientation="Horizontal">
+                      <Button Content="Previous chapter" Style="{StaticResource FlatButton}" Click="ChapterPrev_Click" Margin="0,0,8,0"/>
+                      <Button Content="Next chapter" Style="{StaticResource FlatButton}" Click="ChapterNext_Click"/>
+                    </StackPanel>
+                    <TextBlock Text="When the queue ends" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,18,0,6"/>
+                    <StackPanel Orientation="Horizontal">
+                      <ToggleButton x:Name="RepeatToggle2" Style="{StaticResource IconToggle}" ToolTip="Repeat queue" Click="Repeat_Click">
+                        <ui:IconView Data="{StaticResource Icon.Repeat}"/>
+                      </ToggleButton>
+                      <ToggleButton x:Name="ShuffleToggle2" Style="{StaticResource IconToggle}" ToolTip="Shuffle" Click="Shuffle_Click">
+                        <ui:IconView Data="{StaticResource Icon.Shuffle}"/>
+                      </ToggleButton>
+                    </StackPanel>
+                    <TextBlock Text="Waveform on the seek bar" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,18,0,4"/>
+                    <StackPanel x:Name="WaveOptions"/>
+                  </StackPanel>
+
+                  <StackPanel x:Name="PaneSubs" Visibility="Collapsed">
+                    <TextBlock Text="Subtitle track" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,6,0,4"/>
+                    <StackPanel x:Name="SubTracks"/>
+                    <Button Content="Add subtitle file…" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Click="AddSubtitle_Click"/>
+                    <TextBlock Text="Subtitle delay" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,18,0,6"/>
+                    <DockPanel>
+                      <Button DockPanel.Dock="Right" Content="Reset" Style="{StaticResource FlatButton}" Padding="10,5" Margin="10,0,0,0" Click="SubDelayReset_Click"/>
+                      <TextBlock x:Name="SubDelayValue" DockPanel.Dock="Right" Width="62" TextAlignment="Right" VerticalAlignment="Center" FontSize="13"/>
+                      <Slider x:Name="SubDelaySlider" Minimum="-10" Maximum="10" SmallChange="0.05" LargeChange="0.5" ValueChanged="SubDelaySlider_ValueChanged"/>
+                    </DockPanel>
+                  </StackPanel>
+
+                  <StackPanel x:Name="PaneAudio" Visibility="Collapsed">
+                    <TextBlock Text="Audio track" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,6,0,4"/>
+                    <StackPanel x:Name="AudioTracks"/>
+                    <TextBlock x:Name="AudioDevicesHeader" Text="Output device" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,16,0,4"/>
+                    <StackPanel x:Name="AudioDevices"/>
+                    <TextBlock Text="Audio delay" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,16,0,6"/>
+                    <DockPanel>
+                      <Button DockPanel.Dock="Right" Content="Reset" Style="{StaticResource FlatButton}" Padding="10,5" Margin="10,0,0,0" Click="AudioDelayReset_Click"/>
+                      <TextBlock x:Name="AudioDelayValue" DockPanel.Dock="Right" Width="62" TextAlignment="Right" VerticalAlignment="Center" FontSize="13"/>
+                      <Slider x:Name="AudioDelaySlider" Minimum="-5" Maximum="5" SmallChange="0.05" LargeChange="0.25" ValueChanged="AudioDelaySlider_ValueChanged"/>
+                    </DockPanel>
+                  </StackPanel>
+
+                  <StackPanel x:Name="PaneVideo" Visibility="Collapsed">
+                    <TextBlock Text="Aspect ratio" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,6,0,4"/>
+                    <StackPanel x:Name="AspectList"/>
+                    <TextBlock Text="Video track" Foreground="{StaticResource TextDim}" FontSize="12" Margin="2,16,0,4"/>
+                    <StackPanel x:Name="VideoTracks"/>
+                    <Button Content="Take snapshot" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,14,0,0" Click="Snapshot_Click"/>
+                  </StackPanel>
+                </Grid>
+              </ScrollViewer>
+            </DockPanel>
+
+            <!-- Queue -->
+            <DockPanel x:Name="QueuePane" Visibility="Collapsed">
+              <DockPanel DockPanel.Dock="Top" Margin="16,10,8,6">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                  <Button Style="{StaticResource IconButton}" ToolTip="Sort by name" Click="QueueSort_Click"><ui:IconView Data="{StaticResource Icon.Sort}" Size="16"/></Button>
+                  <ToggleButton x:Name="RepeatToggle" Style="{StaticResource IconToggle}" ToolTip="Repeat queue" Click="Repeat_Click"><ui:IconView Data="{StaticResource Icon.Repeat}" Size="16"/></ToggleButton>
+                  <ToggleButton x:Name="ShuffleToggle" Style="{StaticResource IconToggle}" ToolTip="Shuffle" Click="Shuffle_Click"><ui:IconView Data="{StaticResource Icon.Shuffle}" Size="16"/></ToggleButton>
+                  <Button Style="{StaticResource IconButton}" ToolTip="Remove selected (Delete)" Click="QueueRemove_Click"><ui:IconView Data="{StaticResource Icon.Remove}" Size="16"/></Button>
+                  <Button Style="{StaticResource IconButton}" ToolTip="Add files" Click="QueueAdd_Click"><ui:IconView Data="{StaticResource Icon.Add}" Size="16"/></Button>
+                </StackPanel>
+                <TextBlock x:Name="QueueHeader" VerticalAlignment="Center" FontSize="12.5" Foreground="{StaticResource TextDim}"/>
+              </DockPanel>
+              <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Divider}" Margin="12,0,12,4"/>
+              <TextBlock x:Name="QueueEmpty" DockPanel.Dock="Top" Text="Drag files here or press + to add them." Foreground="{StaticResource TextFaint}"
+                         FontSize="12.5" Margin="18,14" TextWrapping="Wrap"/>
+              <ListBox x:Name="QueueList" Background="Transparent" BorderThickness="0" Margin="6,0,6,8"
+                       ItemContainerStyle="{StaticResource QueueRow}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                       MouseDoubleClick="QueueList_MouseDoubleClick" KeyDown="QueueList_KeyDown">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <DockPanel>
+                      <ui:IconView x:Name="Now" DockPanel.Dock="Left" Data="{StaticResource Icon.Play}" Filled="True" Size="12"
+                                   Foreground="{StaticResource Accent}" Margin="0,0,8,0" Visibility="Hidden" VerticalAlignment="Center"/>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding DurationText}" Foreground="{StaticResource TextFaint}" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                      <TextBlock x:Name="Name" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <DataTemplate.Triggers>
+                      <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                        <Setter TargetName="Now" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="Name" Property="Foreground" Value="{StaticResource AccentHi}"/>
+                      </DataTrigger>
+                    </DataTemplate.Triggers>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+
+            <!-- Keyboard shortcuts (imported from vlcrc) -->
+            <DockPanel x:Name="KeysPane" Visibility="Collapsed">
+              <TextBlock DockPanel.Dock="Top" Text="Keyboard shortcuts" FontSize="14" Foreground="{StaticResource IconHi}" Margin="18,14,0,2"/>
+              <TextBlock DockPanel.Dock="Top" Text="From your VLC settings (vlcrc)" FontSize="11.5" Foreground="{StaticResource TextFaint}" Margin="18,0,0,8"/>
+              <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="8,0,8,10">
+                <ItemsControl x:Name="KeysList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="10,5">
+                        <Border DockPanel.Dock="Right" Background="#262626" CornerRadius="5" Padding="7,2">
+                          <TextBlock Text="{Binding Keys}" FontSize="11.5" Foreground="{StaticResource Text}"/>
+                        </Border>
+                        <TextBlock Text="{Binding Name}" FontSize="12.5" Foreground="{StaticResource TextDim}" VerticalAlignment="Center"/>
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Grid>
+        </Border>
+
+        <!-- Bottom bar. Slides down when idle; in fullscreen it becomes a floating dock. -->
+        <Border x:Name="BottomBar" Grid.Row="2" Height="60" Background="{StaticResource Bar}" CornerRadius="0,0,8,8">
+          <Border.RenderTransform><TranslateTransform x:Name="BottomShift"/></Border.RenderTransform>
+          <Grid x:Name="BarGrid" Margin="12,0,10,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel x:Name="BarLeft" Orientation="Horizontal" VerticalAlignment="Center">
+              <Button x:Name="PrevButton" Style="{StaticResource IconButton}" Click="Prev_Click">
+                <ui:IconView Data="{StaticResource Icon.Prev}" Filled="True" Size="17"/>
+              </Button>
+              <Button x:Name="PlayButton" Style="{StaticResource PlayPill}" Margin="4,0" Click="Play_Click">
+                <ui:IconView x:Name="PlayIcon" Data="{StaticResource Icon.Play}" Filled="True" Size="17" StrokeWidth="1.2"/>
+              </Button>
+              <Button x:Name="NextButton" Style="{StaticResource IconButton}" Click="Next_Click">
+                <ui:IconView Data="{StaticResource Icon.Next}" Filled="True" Size="17"/>
+              </Button>
+              <TextBlock x:Name="TimeText" DockPanel.Dock="Left" Text="00:00:00" Width="74" TextAlignment="Center" VerticalAlignment="Center"
+                         FontSize="13" Foreground="#9A9A9A" Margin="6,0,8,0"/>
+            </StackPanel>
+            <ui:SeekBar x:Name="Seek" Grid.Column="1" VerticalAlignment="Center"/>
+            <StackPanel x:Name="BarRight" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+              <TextBlock x:Name="DurationText" DockPanel.Dock="Right" Text="00:00:00" Width="74" TextAlignment="Center" VerticalAlignment="Center" FontSize="13" Foreground="#9A9A9A"/>
+              <Button x:Name="MuteButton" Style="{StaticResource IconButton}" Click="Mute_Click" Margin="2,0,0,0">
+                <ui:IconView x:Name="MuteIcon" Data="{StaticResource Icon.Volume}"/>
+              </Button>
+              <ui:ConeVolume x:Name="Volume" VerticalAlignment="Center" Margin="2,0,12,0"/>
+              <Button x:Name="AudioButton" Style="{StaticResource IconButton}" Click="AudioMenu_Click">
+                <ui:IconView Data="{StaticResource Icon.Audio}"/>
+              </Button>
+              <Button x:Name="SubsButton" Style="{StaticResource IconButton}" Click="SubsMenu_Click">
+                <ui:IconView Data="{StaticResource Icon.Subtitles}"/>
+              </Button>
+              <Button x:Name="GearButton" Style="{StaticResource IconButton}" Click="Gear_Click">
+                <Grid>
+                  <ui:IconView Data="{StaticResource Icon.Settings}"/>
+                  <ui:IconView Data="{StaticResource Icon.GearPlay}" Filled="True" StrokeWidth="1"/>
+                </Grid>
+              </Button>
+              <Button x:Name="QueueButton" Style="{StaticResource IconButton}" Click="Queue_Click" Margin="8,0,0,0">
+                <ui:IconView Data="{StaticResource Icon.Queue}"/>
+              </Button>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Fullscreen controller: a floating rounded pill (from the redesign skin). Seek row across
+             the top; below it the title on the left, transport centred, tools on the right. The
+             bottom bar's own controls are moved in here while fullscreen (see ApplyBarLayout), so
+             there is one set of controls and state. -->
+        <Border x:Name="Dock" Grid.Row="2" Visibility="Collapsed" Width="1000" Height="104" HorizontalAlignment="Center"
+                Margin="0,0,0,36" CornerRadius="18" Background="{StaticResource Bar}" BorderBrush="#262626" BorderThickness="1"
+                Padding="18,10,12,6" Effect="{StaticResource Shadow}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="34"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <DockPanel x:Name="DockSeekRow" Margin="0,0,6,0"/>
+            <Grid Grid.Row="1">
+              <TextBlock x:Name="DockTitle" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="13.5" Foreground="#C4C4C4"
+                         TextTrimming="CharacterEllipsis" IsHitTestVisible="False" MaxWidth="300"/>
+              <StackPanel x:Name="DockCenter" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <StackPanel x:Name="DockRight" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="DockExitFs" Style="{StaticResource IconButton}" Click="Fullscreen_Click" Margin="4,0,0,0">
+                  <ui:IconView Data="{StaticResource Icon.ExitFullscreen}" Size="17"/>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- Network stream input -->
+      <Border x:Name="UrlBox" Visibility="Collapsed" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Background="{StaticResource Menu}" CornerRadius="14" Padding="18" BorderBrush="#2A2A2A" BorderThickness="1" Effect="{StaticResource Shadow}">
+        <StackPanel>
+          <TextBlock Text="Open network stream" FontSize="14" Foreground="{StaticResource IconHi}" Margin="0,0,0,4"/>
+          <TextBlock Text="A URL to a video, stream or playlist (http, rtsp, m3u…)" FontSize="12" Foreground="{StaticResource TextFaint}" Margin="0,0,0,12"/>
+          <TextBox x:Name="UrlInput" Style="{StaticResource DarkText}" KeyDown="UrlInput_KeyDown"/>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Cancel" Style="{StaticResource FlatButton}" Margin="0,0,8,0" Click="UrlCancel_Click"/>
+            <Button Content="Play" Style="{StaticResource FlatButton}" Background="{StaticResource Accent}" Foreground="#111" Click="UrlOpen_Click"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </vlc:VideoView>
+</Window>
